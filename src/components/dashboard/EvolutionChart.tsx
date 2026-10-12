@@ -13,6 +13,7 @@ import {
   Legend,
 } from 'recharts';
 import { formatCurrency } from '@/lib/utils/formatters';
+import { useTheme } from '@/components/providers/ThemeProvider';
 
 interface EvolutionChartProps {
   data: {
@@ -23,6 +24,8 @@ interface EvolutionChartProps {
 }
 
 export function EvolutionChart({ data }: EvolutionChartProps) {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const hasData = data.some((d) => d.income > 0 || d.expense > 0);
 
   return (
@@ -39,16 +42,21 @@ export function EvolutionChart({ data }: EvolutionChartProps) {
           <div className="h-72 w-full pt-2">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.15} />
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke={isDark ? '#334155' : '#e2e8f0'}
+                  opacity={0.6}
+                />
                 <XAxis
                   dataKey="monthLabel"
-                  stroke="#888888"
+                  stroke={isDark ? '#94a3b8' : '#64748b'}
                   fontSize={12}
                   tickLine={false}
                   axisLine={false}
                 />
                 <YAxis
-                  stroke="#888888"
+                  stroke={isDark ? '#94a3b8' : '#64748b'}
                   fontSize={11}
                   tickLine={false}
                   axisLine={false}
@@ -63,9 +71,15 @@ export function EvolutionChart({ data }: EvolutionChartProps) {
                 <Tooltip
                   formatter={(value: any) => [formatCurrency(Number(value) || 0), '']}
                   contentStyle={{
+                    backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                    borderColor: isDark ? '#1e293b' : '#e2e8f0',
+                    color: isDark ? '#f8fafc' : '#0f172a',
                     borderRadius: '12px',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                    fontSize: '12px',
+                  }}
+                  itemStyle={{
+                    color: isDark ? '#f8fafc' : '#0f172a',
                   }}
                 />
                 <Legend

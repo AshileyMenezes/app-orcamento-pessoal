@@ -3,6 +3,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { getCurrentUser } from '@/actions/auth';
 import { redirect } from 'next/navigation';
+import { SidebarProvider } from '@/components/providers/SidebarProvider';
 
 export default async function DashboardLayout({
   children,
@@ -15,18 +16,20 @@ export default async function DashboardLayout({
     redirect('/login');
   }
 
+  const userName = authData.profile?.full_name;
+  const userEmail = authData.user.email;
+
   return (
-    <div className="flex min-h-screen bg-slate-50/60 dark:bg-slate-950">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0">
-        <Header
-          userName={authData.profile?.full_name}
-          userEmail={authData.user.email}
-        />
-        <main className="flex-1 p-6 sm:p-8 max-w-7xl w-full mx-auto">
-          {children}
-        </main>
+    <SidebarProvider>
+      <div className="flex min-h-screen bg-slate-50/70 dark:bg-slate-950 transition-colors duration-200">
+        <Sidebar userName={userName} userEmail={userEmail} />
+        <div className="flex-1 flex flex-col min-w-0">
+          <Header userName={userName} userEmail={userEmail} />
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </SidebarProvider>
   );
 }

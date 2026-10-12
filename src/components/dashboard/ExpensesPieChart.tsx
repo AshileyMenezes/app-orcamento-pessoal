@@ -11,6 +11,7 @@ import {
   Legend,
 } from 'recharts';
 import { formatCurrency, formatPercentage } from '@/lib/utils/formatters';
+import { useTheme } from '@/components/providers/ThemeProvider';
 
 interface ExpensesPieChartProps {
   data: {
@@ -22,6 +23,8 @@ interface ExpensesPieChartProps {
 }
 
 export function ExpensesPieChart({ data }: ExpensesPieChartProps) {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const hasData = data && data.length > 0;
 
   return (
@@ -58,9 +61,15 @@ export function ExpensesPieChart({ data }: ExpensesPieChartProps) {
                     item.payload.categoryName,
                   ]}
                   contentStyle={{
+                    backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                    borderColor: isDark ? '#1e293b' : '#e2e8f0',
+                    color: isDark ? '#f8fafc' : '#0f172a',
                     borderRadius: '12px',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                    fontSize: '12px',
+                  }}
+                  itemStyle={{
+                    color: isDark ? '#f8fafc' : '#0f172a',
                   }}
                 />
                 <Legend
