@@ -3,14 +3,22 @@
 import { createClient } from '@/lib/supabase/server';
 import { DashboardMetrics, TransactionWithDetails } from '@/lib/types/database';
 import { MONTH_NAMES } from '@/lib/utils/formatters';
+import {
+  calculateTotalBalance,
+  calculateFinancialTotals,
+  calculateCategoryExpenseTotals,
+  toBig,
+  roundCurrency,
+} from '@/lib/utils/finance';
 
 export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   const supabase = await createClient();
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
 
-  if (!user) {
+  if (authError || !user) {
     return {
       totalBalance: 0,
       totalIncomeMonth: 0,
@@ -31,14 +39,24 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   const endOfMonth = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
   // 1. Buscar contas
-  const { data: accounts } = await supabase.from('accounts').select('initial_balance');
-  const initialBalanceTotal = (accounts || []).reduce(
-    (sum, acc) => sum + (Number(acc.initial_balance) || 0),
-    0
-  );
+  const { data: accounts, error: accError } = await supabase
+    .from('accounts')
+    .select('initial_balance');
+
+  if (accError && (accError.code === '401' || accError.code === '403')) {
+    return {
+      totalBalance: 0,
+      totalIncomeMonth: 0,
+      totalExpenseMonth: 0,
+      savingsRate: 0,
+      recentTransactions: [],
+      expensesByCategory: [],
+      monthlyEvolution: [],
+    };
+  }
 
   // 2. Buscar todas as transações concluídas do usuário
-  const { data: allTransactions } = await supabase
+  const { data: allTransactions, error: txError } = await supabase
     .from('transactions')
     .select(`
       *,
@@ -49,69 +67,40 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     .order('date', { ascending: false })
     .order('created_at', { ascending: false });
 
+  if (txError && (txError.code === '401' || txError.code === '403')) {
+    return {
+      totalBalance: 0,
+      totalIncomeMonth: 0,
+      totalExpenseMonth: 0,
+      savingsRate: 0,
+      recentTransactions: [],
+      expensesByCategory: [],
+      monthlyEvolution: [],
+    };
+  }
+
   const txList = (allTransactions || []).map((t) => ({
     ...t,
-    amount: Number(t.amount),
+    amount: roundCurrency(t.amount),
   })) as TransactionWithDetails[];
 
-  // 3. Saldo Total Global
-  const balanceDelta = txList.reduce((acc, t) => {
-    if (t.type === 'income') return acc + t.amount;
-    if (t.type === 'expense') return acc - t.amount;
-    return acc;
-  }, 0);
-  const totalBalance = initialBalanceTotal + balanceDelta;
+  // 3. Saldo Total Global usando big.js
+  const totalBalance = calculateTotalBalance(accounts || [], txList);
 
-  // 4. Mês atual: Entradas e Saídas
+  // 4. Mês atual: Entradas, Saídas e Poupança usando big.js
   const currentMonthTx = txList.filter(
     (t) => t.date >= startOfMonth && t.date <= endOfMonth
   );
 
-  const totalIncomeMonth = currentMonthTx
-    .filter((t) => t.type === 'income')
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const totalExpenseMonth = currentMonthTx
-    .filter((t) => t.type === 'expense')
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const netSavings = totalIncomeMonth - totalExpenseMonth;
-  const savingsRate =
-    totalIncomeMonth > 0 ? Math.max(0, (netSavings / totalIncomeMonth) * 100) : 0;
+  const { totalIncome, totalExpense, savingsRate } = calculateFinancialTotals(currentMonthTx);
 
   // 5. Transações recentes (top 5)
   const recentTransactions = txList.slice(0, 5);
 
-  // 6. Despesas por categoria no mês atual
-  const categoryMap: Record<
-    string,
-    { categoryName: string; color: string; total: number }
-  > = {};
+  // 6. Despesas por categoria no mês atual usando big.js
+  const expensesByCategory = calculateCategoryExpenseTotals(currentMonthTx);
 
-  currentMonthTx
-    .filter((t) => t.type === 'expense')
-    .forEach((t) => {
-      const catName = t.category?.name || 'Sem Categoria';
-      const catColor = t.category?.color || '#94a3b8';
-
-      if (!categoryMap[catName]) {
-        categoryMap[catName] = {
-          categoryName: catName,
-          color: catColor,
-          total: 0,
-        };
-      }
-      categoryMap[catName].total += t.amount;
-    });
-
-  const expensesByCategory = Object.values(categoryMap)
-    .map((item) => ({
-      ...item,
-      percentage: totalExpenseMonth > 0 ? (item.total / totalExpenseMonth) * 100 : 0,
-    }))
-    .sort((a, b) => b.total - a.total);
-
-  // 7. Evolução dos últimos 6 meses
+  // 7. Evolução dos últimos 6 meses usando big.js
   const monthlyEvolution: { monthLabel: string; income: number; expense: number }[] = [];
 
   for (let i = 5; i >= 0; i--) {
@@ -123,26 +112,19 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     const eDate = `${y}-${String(m).padStart(2, '0')}-${String(lDay).padStart(2, '0')}`;
 
     const monthTx = txList.filter((t) => t.date >= sDate && t.date <= eDate);
-
-    const mIncome = monthTx
-      .filter((t) => t.type === 'income')
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    const mExpense = monthTx
-      .filter((t) => t.type === 'expense')
-      .reduce((sum, t) => sum + t.amount, 0);
+    const monthTotals = calculateFinancialTotals(monthTx);
 
     monthlyEvolution.push({
       monthLabel: `${MONTH_NAMES[m - 1].slice(0, 3)}/${String(y).slice(2)}`,
-      income: mIncome,
-      expense: mExpense,
+      income: monthTotals.totalIncome,
+      expense: monthTotals.totalExpense,
     });
   }
 
   return {
     totalBalance,
-    totalIncomeMonth,
-    totalExpenseMonth,
+    totalIncomeMonth: totalIncome,
+    totalExpenseMonth: totalExpense,
     savingsRate,
     recentTransactions,
     expensesByCategory,

@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { BudgetWithCategory } from '@/lib/types/database';
 import { budgetSchema, BudgetInput } from '@/lib/validations/budget';
+import { calculateBudgetUsage, toBig, roundCurrency } from '@/lib/utils/finance';
 import { revalidatePath } from 'next/cache';
 
 export async function getBudgetsWithSpent(month?: number, year?: number): Promise<BudgetWithCategory[]> {
@@ -12,9 +13,10 @@ export async function getBudgetsWithSpent(month?: number, year?: number): Promis
   const supabase = await createClient();
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
 
-  if (!user) return [];
+  if (authError || !user) return [];
 
   // Buscar orçamentos do mês/ano com a categoria relacionada
   const { data: budgets, error: budgetError } = await supabase
@@ -27,11 +29,10 @@ export async function getBudgetsWithSpent(month?: number, year?: number): Promis
     .eq('year', currentYear);
 
   if (budgetError || !budgets) {
-    console.error('Error fetching budgets:', budgetError);
     return [];
   }
 
-  // Buscar transações de despesa do mês para calcular o gasto real por categoria
+  // Buscar transações de despesa do mês para calcular o gasto real por categoria com precisão
   const startDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
   const lastDay = new Date(currentYear, currentMonth, 0).getDate();
   const endDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
@@ -46,21 +47,20 @@ export async function getBudgetsWithSpent(month?: number, year?: number): Promis
 
   const spentByCategory = (expenses || []).reduce<Record<string, number>>((acc, tx) => {
     if (tx.category_id) {
-      acc[tx.category_id] = (acc[tx.category_id] || 0) + Number(tx.amount);
+      const prev = toBig(acc[tx.category_id] || 0);
+      acc[tx.category_id] = roundCurrency(prev.plus(toBig(tx.amount)));
     }
     return acc;
   }, {});
 
   return budgets.map((b) => {
-    const limit = Number(b.amount_limit);
-    const spent = spentByCategory[b.category_id] || 0;
-    const percentage = limit > 0 ? (spent / limit) * 100 : 0;
+    const usage = calculateBudgetUsage(b.amount_limit, spentByCategory[b.category_id] || 0);
 
     return {
       ...b,
-      amount_limit: limit,
-      spent_amount: spent,
-      percentage_used: percentage,
+      amount_limit: usage.limit,
+      spent_amount: usage.spent,
+      percentage_used: usage.percentageUsed,
       category: b.category,
     };
   });

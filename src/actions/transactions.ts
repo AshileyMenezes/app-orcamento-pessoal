@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { TransactionWithDetails } from '@/lib/types/database';
 import { transactionSchema, TransactionInput } from '@/lib/validations/transaction';
+import { validateFinancialInput, roundCurrency } from '@/lib/utils/finance';
 import { revalidatePath } from 'next/cache';
 
 export async function getTransactions(filters?: {
@@ -17,9 +18,10 @@ export async function getTransactions(filters?: {
   const supabase = await createClient();
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
 
-  if (!user) return [];
+  if (authError || !user) return [];
 
   let query = supabase
     .from('transactions')
@@ -62,13 +64,12 @@ export async function getTransactions(filters?: {
   const { data, error } = await query;
 
   if (error) {
-    console.error('Error fetching transactions:', error);
     return [];
   }
 
   return (data || []).map((item) => ({
     ...item,
-    amount: Number(item.amount),
+    amount: roundCurrency(item.amount),
   })) as TransactionWithDetails[];
 }
 
@@ -78,12 +79,21 @@ export async function createTransaction(input: TransactionInput) {
     return { error: parsed.error.issues[0]?.message || 'Dados inválidos' };
   }
 
+  // Validação estrita de integridade financeira
+  const financialValidation = validateFinancialInput(parsed.data.type, parsed.data.amount);
+  if (!financialValidation.valid) {
+    return { error: financialValidation.error || 'Valor inválido para o tipo de transação' };
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
 
-  if (!user) return { error: 'Não autorizado' };
+  if (authError || !user) {
+    return { error: 'Sessão expirada ou não autorizada. Faça login novamente.' };
+  }
 
   const { data, error } = await supabase
     .from('transactions')
@@ -91,7 +101,7 @@ export async function createTransaction(input: TransactionInput) {
       user_id: user.id,
       account_id: parsed.data.account_id,
       category_id: parsed.data.category_id || null,
-      amount: parsed.data.amount,
+      amount: financialValidation.cleanAmount ?? parsed.data.amount,
       type: parsed.data.type,
       description: parsed.data.description,
       date: parsed.data.date,
@@ -100,7 +110,12 @@ export async function createTransaction(input: TransactionInput) {
     .select()
     .single();
 
-  if (error) return { error: error.message };
+  if (error) {
+    if (error.code === '401' || error.code === '403') {
+      return { error: 'Acesso negado ou não autorizado.' };
+    }
+    return { error: error.message };
+  }
 
   revalidatePath('/dashboard');
   revalidatePath('/transactions');
@@ -114,12 +129,22 @@ export async function updateTransaction(
   id: string,
   input: Partial<TransactionInput>
 ) {
+  if (input.type && input.amount !== undefined) {
+    const financialValidation = validateFinancialInput(input.type, input.amount);
+    if (!financialValidation.valid) {
+      return { error: financialValidation.error || 'Valor inválido' };
+    }
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
 
-  if (!user) return { error: 'Não autorizado' };
+  if (authError || !user) {
+    return { error: 'Sessão expirada ou não autorizada. Faça login novamente.' };
+  }
 
   const { error } = await supabase
     .from('transactions')
@@ -129,7 +154,12 @@ export async function updateTransaction(
     .eq('id', id)
     .eq('user_id', user.id);
 
-  if (error) return { error: error.message };
+  if (error) {
+    if (error.code === '401' || error.code === '403') {
+      return { error: 'Acesso negado ou não autorizado.' };
+    }
+    return { error: error.message };
+  }
 
   revalidatePath('/dashboard');
   revalidatePath('/transactions');

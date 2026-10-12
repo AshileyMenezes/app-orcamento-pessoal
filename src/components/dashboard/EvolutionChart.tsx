@@ -52,7 +52,13 @@ export function EvolutionChart({ data }: EvolutionChartProps) {
                   fontSize={11}
                   tickLine={false}
                   axisLine={false}
-                  tickFormatter={(val) => `R$ ${val}`}
+                  tickFormatter={(val) =>
+                    new Intl.NumberFormat('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                      maximumFractionDigits: 0,
+                    }).format(Number(val) || 0)
+                  }
                 />
                 <Tooltip
                   formatter={(value: any) => [formatCurrency(Number(value) || 0), '']}

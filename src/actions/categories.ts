@@ -8,9 +8,10 @@ export async function getCategories(): Promise<Category[]> {
   const supabase = await createClient();
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
 
-  if (!user) return [];
+  if (authError || !user) return [];
 
   const { data, error } = await supabase
     .from('categories')
@@ -18,7 +19,6 @@ export async function getCategories(): Promise<Category[]> {
     .order('name', { ascending: true });
 
   if (error) {
-    console.error('Error fetching categories:', error);
     return [];
   }
 

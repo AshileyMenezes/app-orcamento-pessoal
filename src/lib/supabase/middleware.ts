@@ -28,6 +28,7 @@ export async function updateSession(request: NextRequest) {
 
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
 
   const isAuthPage =
@@ -41,8 +42,8 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/accounts') ||
     request.nextUrl.pathname.startsWith('/categories');
 
-  // Se não estiver logado e tentar acessar rota protegida -> redireciona para /login
-  if (!user && isProtectedPage) {
+  // Se houver erro de autenticação (401/403) ou não estiver logado ao tentar acessar rota protegida -> redireciona para /login
+  if ((!user || authError) && isProtectedPage) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('redirectTo', request.nextUrl.pathname);
