@@ -87,88 +87,107 @@ alter table public.budgets enable row level security;
 -- Políticas para profiles
 create policy "Users can view own profile"
   on public.profiles for select
-  using (auth.uid() = id);
+  to authenticated
+  using ((select auth.uid()) = id);
 
 create policy "Users can update own profile"
   on public.profiles for update
-  using (auth.uid() = id);
+  to authenticated
+  using ((select auth.uid()) = id)
+  with check ((select auth.uid()) = id);
 
 create policy "Users can insert own profile"
   on public.profiles for insert
-  with check (auth.uid() = id);
+  to authenticated
+  with check ((select auth.uid()) = id);
 
 -- Políticas para categories
 create policy "Users can view own categories"
   on public.categories for select
-  using (auth.uid() = user_id);
+  to authenticated
+  using ((select auth.uid()) = user_id);
 
 create policy "Users can insert own categories"
   on public.categories for insert
-  with check (auth.uid() = user_id);
+  to authenticated
+  with check ((select auth.uid()) = user_id);
 
 create policy "Users can update own categories"
   on public.categories for update
-  using (auth.uid() = user_id);
+  to authenticated
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 create policy "Users can delete own categories"
   on public.categories for delete
-  using (auth.uid() = user_id);
+  to authenticated
+  using ((select auth.uid()) = user_id);
 
 -- Políticas para accounts
 create policy "Users can view own accounts"
   on public.accounts for select
-  using (auth.uid() = user_id);
+  to authenticated
+  using ((select auth.uid()) = user_id);
 
 create policy "Users can insert own accounts"
   on public.accounts for insert
-  with check (auth.uid() = user_id);
+  to authenticated
+  with check ((select auth.uid()) = user_id);
 
 create policy "Users can update own accounts"
   on public.accounts for update
-  using (auth.uid() = user_id);
-
-create policy "Users can delete own accounts"
-  on public.accounts for delete
-  using (auth.uid() = user_id);
+  to authenticated
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 -- Políticas para transactions
 create policy "Users can view own transactions"
   on public.transactions for select
-  using (auth.uid() = user_id);
+  to authenticated
+  using ((select auth.uid()) = user_id);
 
 create policy "Users can insert own transactions"
   on public.transactions for insert
-  with check (auth.uid() = user_id);
+  to authenticated
+  with check ((select auth.uid()) = user_id);
 
 create policy "Users can update own transactions"
   on public.transactions for update
-  using (auth.uid() = user_id);
+  to authenticated
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 create policy "Users can delete own transactions"
   on public.transactions for delete
-  using (auth.uid() = user_id);
+  to authenticated
+  using ((select auth.uid()) = user_id);
 
 -- Políticas para budgets
 create policy "Users can view own budgets"
   on public.budgets for select
-  using (auth.uid() = user_id);
+  to authenticated
+  using ((select auth.uid()) = user_id);
 
 create policy "Users can insert own budgets"
   on public.budgets for insert
-  with check (auth.uid() = user_id);
+  to authenticated
+  with check ((select auth.uid()) = user_id);
 
 create policy "Users can update own budgets"
   on public.budgets for update
-  using (auth.uid() = user_id);
+  to authenticated
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 create policy "Users can delete own budgets"
   on public.budgets for delete
-  using (auth.uid() = user_id);
+  to authenticated
+  using ((select auth.uid()) = user_id);
 
 -- ==============================================================================
 -- TRIGGER AUTOMÁTICO: NOVO USUÁRIO -> PERFIL + DADOS PADRÃO
 -- ==============================================================================
-create orreplace function public.handle_new_user()
+create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer set search_path = public

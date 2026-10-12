@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Category, Account, TransactionWithDetails } from '@/lib/types/database';
 import { createTransaction, updateTransaction } from '@/actions/transactions';
 import { ArrowUpRight, ArrowDownRight, ArrowLeftRight } from 'lucide-react';
+import { parseCurrency } from '@/lib/utils/formatters';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -29,7 +30,12 @@ export function TransactionModal({
   );
   const [description, setDescription] = useState(transactionToEdit?.description || '');
   const [amount, setAmount] = useState<string>(
-    transactionToEdit ? String(transactionToEdit.amount) : ''
+    transactionToEdit
+      ? transactionToEdit.amount.toLocaleString('pt-BR', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })
+      : ''
   );
   const [accountId, setAccountId] = useState(
     transactionToEdit?.account_id || accounts[0]?.id || ''
@@ -50,7 +56,7 @@ export function TransactionModal({
     e.preventDefault();
     setError(null);
 
-    const numAmount = parseFloat(amount.replace(',', '.'));
+    const numAmount = parseCurrency(amount);
     if (isNaN(numAmount) || numAmount <= 0) {
       setError('Insira um valor válido maior que zero.');
       return;
@@ -167,6 +173,19 @@ export function TransactionModal({
             placeholder="0,00"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
+            onBlur={() => {
+              if (amount) {
+                const parsed = parseCurrency(amount);
+                if (parsed > 0) {
+                  setAmount(
+                    parsed.toLocaleString('pt-BR', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })
+                  );
+                }
+              }
+            }}
             required
             autoFocus
           />

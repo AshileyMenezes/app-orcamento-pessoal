@@ -5,6 +5,7 @@ import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { createAccount } from '@/actions/accounts';
+import { parseCurrency } from '@/lib/utils/formatters';
 
 interface AccountModalProps {
   isOpen: boolean;
@@ -23,7 +24,7 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
     e.preventDefault();
     setError(null);
 
-    const numBalance = initialBalance ? parseFloat(initialBalance.replace(',', '.')) : 0;
+    const numBalance = initialBalance ? parseCurrency(initialBalance) : 0;
     if (isNaN(numBalance)) {
       setError('Insira um saldo inicial válido');
       return;
@@ -100,6 +101,17 @@ export function AccountModal({ isOpen, onClose }: AccountModalProps) {
             placeholder="0,00"
             value={initialBalance}
             onChange={(e) => setInitialBalance(e.target.value)}
+            onBlur={() => {
+              if (initialBalance) {
+                const parsed = parseCurrency(initialBalance);
+                setInitialBalance(
+                  parsed.toLocaleString('pt-BR', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })
+                );
+              }
+            }}
           />
         </div>
 

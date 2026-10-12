@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Category } from '@/lib/types/database';
 import { createOrUpdateBudget } from '@/actions/budgets';
+import { parseCurrency } from '@/lib/utils/formatters';
 
 interface BudgetModalProps {
   isOpen: boolean;
@@ -34,7 +35,7 @@ export function BudgetModal({
     e.preventDefault();
     setError(null);
 
-    const numLimit = parseFloat(limit.replace(',', '.'));
+    const numLimit = parseCurrency(limit);
     if (isNaN(numLimit) || numLimit <= 0) {
       setError('Insira um valor limite válido.');
       return;
@@ -108,6 +109,19 @@ export function BudgetModal({
             placeholder="Ex: 800,00"
             value={limit}
             onChange={(e) => setLimit(e.target.value)}
+            onBlur={() => {
+              if (limit) {
+                const parsed = parseCurrency(limit);
+                if (parsed > 0) {
+                  setLimit(
+                    parsed.toLocaleString('pt-BR', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })
+                  );
+                }
+              }
+            }}
             required
           />
         </div>
