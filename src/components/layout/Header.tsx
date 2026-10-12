@@ -45,19 +45,19 @@ export function Header({ userName, userEmail }: HeaderProps) {
         <button
           onClick={toggleTheme}
           type="button"
-          title={theme === 'dark' ? 'Mudar para Modo Claro' : 'Mudar para Modo Escuro'}
-          aria-label="Alternar entre modo claro e escuro"
-          className="p-2.5 rounded-xl border border-slate-200/70 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shadow-xs flex items-center gap-2"
+          title={theme === 'dark' ? 'Alternar para Modo Claro' : 'Alternar para Modo Escuro'}
+          aria-label="Alternar tema entre claro e escuro"
+          className="p-2 sm:px-3 sm:py-2 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:border-emerald-500/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shadow-xs flex items-center gap-2 cursor-pointer"
         >
           {theme === 'dark' ? (
             <>
-              <Sun className="w-4 h-4 text-amber-500 animate-in spin-in-180 duration-300" />
-              <span className="text-xs font-medium hidden md:inline">Claro</span>
+              <Moon className="w-4 h-4 text-indigo-400" />
+              <span className="text-xs font-semibold hidden sm:inline">Modo Escuro</span>
             </>
           ) : (
             <>
-              <Moon className="w-4 h-4 text-indigo-600 animate-in spin-in-180 duration-300" />
-              <span className="text-xs font-medium hidden md:inline">Escuro</span>
+              <Sun className="w-4 h-4 text-amber-500" />
+              <span className="text-xs font-semibold hidden sm:inline">Modo Claro</span>
             </>
           )}
         </button>

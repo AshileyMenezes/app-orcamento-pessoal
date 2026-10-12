@@ -52,7 +52,7 @@ const NAV_ITEMS = [
 export function Sidebar({ userName, userEmail }: SidebarProps) {
   const pathname = usePathname();
   const { isExpanded, toggleExpanded, isMobileOpen, closeMobile } = useSidebar();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, setTheme, toggleTheme } = useTheme();
 
   const displayName = userName || userEmail?.split('@')[0] || 'Usuário';
 
@@ -173,31 +173,49 @@ export function Sidebar({ userName, userEmail }: SidebarProps) {
 
       {/* Alternador de Tema Rápido (Claro / Escuro) */}
       <div className="px-3 py-2 border-t border-slate-100 dark:border-slate-800/80">
-        <button
-          onClick={toggleTheme}
-          type="button"
-          title={theme === 'dark' ? 'Alternar para Modo Claro' : 'Alternar para Modo Escuro'}
-          className={cn(
-            'w-full flex items-center gap-3 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100 transition-colors',
-            isExpanded ? 'px-3 py-2.5 justify-between' : 'p-2.5 justify-center'
-          )}
-        >
-          <div className="flex items-center gap-2.5">
-            {theme === 'dark' ? (
-              <Sun className="w-4 h-4 text-amber-500 shrink-0" />
-            ) : (
-              <Moon className="w-4 h-4 text-indigo-600 shrink-0" />
-            )}
-            {isExpanded && (
-              <span>{theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}</span>
-            )}
+        {isExpanded ? (
+          <div className="flex items-center p-1 rounded-xl bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60">
+            <button
+              type="button"
+              onClick={() => setTheme('light')}
+              className={cn(
+                'flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer',
+                theme === 'light'
+                  ? 'bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white'
+                  : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+              )}
+            >
+              <Sun className="w-3.5 h-3.5 text-amber-500" />
+              <span>Claro</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTheme('dark')}
+              className={cn(
+                'flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer',
+                theme === 'dark'
+                  ? 'bg-slate-900 text-white shadow-xs dark:bg-slate-900 dark:text-white'
+                  : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+              )}
+            >
+              <Moon className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Escuro</span>
+            </button>
           </div>
-          {isExpanded && (
-            <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-md bg-slate-200/60 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-              {theme === 'dark' ? 'Dark' : 'Light'}
-            </span>
-          )}
-        </button>
+        ) : (
+          <button
+            onClick={toggleTheme}
+            type="button"
+            title={theme === 'dark' ? 'Tema: Escuro (Mudar para Claro)' : 'Tema: Claro (Mudar para Escuro)'}
+            className="w-full flex items-center justify-center p-2.5 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
+          >
+            {theme === 'dark' ? (
+              <Moon className="w-4 h-4 text-indigo-400" />
+            ) : (
+              <Sun className="w-4 h-4 text-amber-500" />
+            )}
+          </button>
+        )}
       </div>
 
       {/* Canto Inferior da Tela: Nome, Email e Ícone de Sair da Conta */}

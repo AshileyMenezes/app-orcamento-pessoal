@@ -31,21 +31,28 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const applyTheme = (t: Theme) => {
+    if (typeof document === 'undefined') return;
     const root = document.documentElement;
     if (t === 'dark') {
       root.classList.add('dark');
       root.classList.remove('light');
+      root.setAttribute('data-theme', 'dark');
       root.style.colorScheme = 'dark';
     } else {
       root.classList.remove('dark');
       root.classList.add('light');
+      root.setAttribute('data-theme', 'light');
       root.style.colorScheme = 'light';
     }
   };
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
-    localStorage.setItem('finanflow-theme', newTheme);
+    try {
+      localStorage.setItem('finanflow-theme', newTheme);
+    } catch {
+      // storage restrito ou indisponível
+    }
     applyTheme(newTheme);
   };
 
