@@ -18,6 +18,8 @@ export async function getAccounts(): Promise<Account[]> {
   const { data: accounts, error: accountsError } = await supabase
     .from('accounts')
     .select('*')
+    .eq('user_id', user.id)
+    .is('deleted_at', null)
     .order('created_at', { ascending: true });
 
   if (accountsError) {
@@ -27,10 +29,12 @@ export async function getAccounts(): Promise<Account[]> {
 
   if (!accounts) return [];
 
-  // Buscar transações para computar o saldo atual com precisão decimal
+  // Buscar transações ativas para computar o saldo atual com precisão decimal (Regras 1 & 3)
   const { data: transactions } = await supabase
     .from('transactions')
     .select('account_id, amount, type, status')
+    .eq('user_id', user.id)
+    .is('deleted_at', null)
     .eq('status', 'completed');
 
   const accountsWithBalance: Account[] = accounts.map((account) => {
@@ -97,16 +101,29 @@ export async function deleteAccount(accountId: string) {
 
   if (!user) return { error: 'Não autorizado' };
 
+  // Regra 3 (Source-Level Security): Verificar transações ativas vinculadas
+  const { count, error: countError } = await supabase
+    .from('transactions')
+    .select('*', { count: 'exact', head: true })
+    .eq('account_id', accountId)
+    .eq('user_id', user.id)
+    .is('deleted_at', null);
+
+  if (countError) return { error: countError.message };
+
+  if (count && count > 0) {
+    return { error: 'Não é possível excluir uma conta que possui transações ativas vinculadas.' };
+  }
+
+  // Regra 1 (Salvaguarda Não-Destrutiva): Soft Delete com deleted_at
   const { error } = await supabase
     .from('accounts')
-    .delete()
+    .update({ deleted_at: new Date().toISOString() })
     .eq('id', accountId)
-    .eq('user_id', user.id);
+    .eq('user_id', user.id)
+    .is('deleted_at', null);
 
   if (error) {
-    if (error.code === '23503') {
-      return { error: 'Não é possível excluir uma conta que possui transações vinculadas.' };
-    }
     return { error: error.message };
   }
 

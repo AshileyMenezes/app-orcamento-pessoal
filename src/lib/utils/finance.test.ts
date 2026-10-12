@@ -166,4 +166,78 @@ describe('Integridade e Validação de Dados Financeiros (big.js)', () => {
       expect(resExpense.cleanAmount).toBe(150.2);
     });
   });
+
+  describe('Salvaguarda Contra Exclusão Destrutiva (Soft Delete - Regra 1)', () => {
+    it('deve ignorar transações marcadas com soft-delete (deleted_at) no saldo da conta', () => {
+      const initialBalance = 1000.0;
+      const transactions = [
+        { type: 'income', amount: 500.0, status: 'completed' },
+        {
+          type: 'income',
+          amount: 1000.0,
+          status: 'completed',
+          deleted_at: '2026-10-12T19:00:00Z', // Excluída logicamente
+        },
+        { type: 'expense', amount: 200.0, status: 'completed' },
+        {
+          type: 'expense',
+          amount: 500.0,
+          status: 'completed',
+          deleted_at: '2026-10-12T19:30:00Z', // Excluída logicamente
+        },
+      ];
+
+      // Saldo deve ser 1000 + 500 - 200 = 1300 (ignorando os 1000 de receita e 500 de despesa soft-deletados)
+      const saldo = calculateAccountBalance(initialBalance, transactions);
+      expect(saldo).toBe(1300.0);
+    });
+
+    it('deve ignorar transações soft-deletadas no cálculo de totais de receitas e despesas', () => {
+      const transactions = [
+        { type: 'income', amount: 2000.0, status: 'completed' },
+        {
+          type: 'income',
+          amount: 8000.0,
+          status: 'completed',
+          deleted_at: '2026-10-12T18:00:00Z',
+        },
+        { type: 'expense', amount: 500.0, status: 'completed' },
+        {
+          type: 'expense',
+          amount: 1500.0,
+          status: 'completed',
+          deleted_at: '2026-10-12T18:30:00Z',
+        },
+      ];
+
+      const metrics = calculateFinancialTotals(transactions);
+      expect(metrics.totalIncome).toBe(2000.0);
+      expect(metrics.totalExpense).toBe(500.0);
+      expect(metrics.netSavings).toBe(1500.0);
+      expect(metrics.savingsRate).toBe(75.0);
+    });
+
+    it('deve desconsiderar categorias de transações soft-deletadas nos totais por categoria', () => {
+      const transactions = [
+        {
+          type: 'expense',
+          amount: 150.0,
+          status: 'completed',
+          category: { name: 'Alimentação', color: '#ff0000' },
+        },
+        {
+          type: 'expense',
+          amount: 999.0,
+          status: 'completed',
+          category: { name: 'Superfluos', color: '#000000' },
+          deleted_at: '2026-10-12T18:00:00Z',
+        },
+      ];
+
+      const catTotals = calculateCategoryExpenseTotals(transactions);
+      expect(catTotals).toHaveLength(1);
+      expect(catTotals[0].categoryName).toBe('Alimentação');
+      expect(catTotals[0].total).toBe(150.0);
+    });
+  });
 });

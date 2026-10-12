@@ -20,29 +20,31 @@ create table if not exists public.profiles (
 -- 3. TABELA DE CATEGORIAS (categories)
 create table if not exists public.categories (
   id uuid default gen_random_uuid() primary key,
-  user_id uuid references public.profiles(id) on delete cascade not null,
+  user_id uuid references public.profiles(id) on delete restrict not null,
   name text not null,
   type text not null check (type in ('income', 'expense')),
   icon text default 'tag' not null,
   color text default '#6366f1' not null,
-  created_at timestamptz default timezone('utc'::text, now()) not null
+  created_at timestamptz default timezone('utc'::text, now()) not null,
+  deleted_at timestamptz default null
 );
 
 -- 4. TABELA DE CONTAS / CARTEIRAS (accounts)
 create table if not exists public.accounts (
   id uuid default gen_random_uuid() primary key,
-  user_id uuid references public.profiles(id) on delete cascade not null,
+  user_id uuid references public.profiles(id) on delete restrict not null,
   name text not null,
   type text default 'checking' not null check (type in ('checking', 'savings', 'wallet', 'investment')),
   initial_balance numeric(14,2) default 0.00 not null,
   color text default '#0ea5e9' not null,
-  created_at timestamptz default timezone('utc'::text, now()) not null
+  created_at timestamptz default timezone('utc'::text, now()) not null,
+  deleted_at timestamptz default null
 );
 
 -- 5. TABELA DE TRANSAÇÕES (transactions)
 create table if not exists public.transactions (
   id uuid default gen_random_uuid() primary key,
-  user_id uuid references public.profiles(id) on delete cascade not null,
+  user_id uuid references public.profiles(id) on delete restrict not null,
   account_id uuid references public.accounts(id) on delete restrict not null,
   category_id uuid references public.categories(id) on delete set null,
   amount numeric(14,2) not null check (amount > 0),
@@ -50,30 +52,32 @@ create table if not exists public.transactions (
   description text not null,
   date date default current_date not null,
   status text default 'completed' not null check (status in ('completed', 'pending')),
-  created_at timestamptz default timezone('utc'::text, now()) not null
+  created_at timestamptz default timezone('utc'::text, now()) not null,
+  deleted_at timestamptz default null
 );
 
 -- 6. TABELA DE ORÇAMENTOS MENSAIS (budgets)
 create table if not exists public.budgets (
   id uuid default gen_random_uuid() primary key,
-  user_id uuid references public.profiles(id) on delete cascade not null,
-  category_id uuid references public.categories(id) on delete cascade not null,
+  user_id uuid references public.profiles(id) on delete restrict not null,
+  category_id uuid references public.categories(id) on delete restrict not null,
   month smallint not null check (month between 1 and 12),
-  year integer not null,
+  year integer not null check (year between 2000 and 2100),
   amount_limit numeric(14,2) not null check (amount_limit > 0),
   created_at timestamptz default timezone('utc'::text, now()) not null,
+  deleted_at timestamptz default null,
   constraint unique_user_category_month_year unique (user_id, category_id, month, year)
 );
 
 -- ==============================================================================
--- ÍNDICES DE PERFORMANCE
+-- ÍNDICES DE PERFORMANCE (FILTRO NÃO-DESTRUTIVO DE SOFT DELETE)
 -- ==============================================================================
-create index if not exists idx_transactions_user_date on public.transactions(user_id, date desc);
-create index if not exists idx_transactions_account on public.transactions(account_id);
-create index if not exists idx_transactions_category on public.transactions(category_id);
-create index if not exists idx_budgets_user_period on public.budgets(user_id, year, month);
-create index if not exists idx_categories_user on public.categories(user_id);
-create index if not exists idx_accounts_user on public.accounts(user_id);
+create index if not exists idx_transactions_active on public.transactions(user_id, date desc) where deleted_at is null;
+create index if not exists idx_transactions_account on public.transactions(account_id) where deleted_at is null;
+create index if not exists idx_transactions_category on public.transactions(category_id) where deleted_at is null;
+create index if not exists idx_budgets_active on public.budgets(user_id, year, month) where deleted_at is null;
+create index if not exists idx_categories_active on public.categories(user_id) where deleted_at is null;
+create index if not exists idx_accounts_active on public.accounts(user_id) where deleted_at is null;
 
 -- ==============================================================================
 -- ROW LEVEL SECURITY (RLS) - ISOLAMENTO TOTAL POR USUÁRIO
@@ -102,10 +106,10 @@ create policy "Users can insert own profile"
   with check ((select auth.uid()) = id);
 
 -- Políticas para categories
-create policy "Users can view own categories"
+create policy "Users can view own active categories"
   on public.categories for select
   to authenticated
-  using ((select auth.uid()) = user_id);
+  using ((select auth.uid()) = user_id and deleted_at is null);
 
 create policy "Users can insert own categories"
   on public.categories for insert
@@ -118,16 +122,17 @@ create policy "Users can update own categories"
   using ((select auth.uid()) = user_id)
   with check ((select auth.uid()) = user_id);
 
-create policy "Users can delete own categories"
+-- Salvaguarda Regras 1 & 3: Bloqueio de Hard Delete físico direto no banco
+create policy "Disallow physical delete on categories"
   on public.categories for delete
   to authenticated
-  using ((select auth.uid()) = user_id);
+  using (false);
 
 -- Políticas para accounts
-create policy "Users can view own accounts"
+create policy "Users can view own active accounts"
   on public.accounts for select
   to authenticated
-  using ((select auth.uid()) = user_id);
+  using ((select auth.uid()) = user_id and deleted_at is null);
 
 create policy "Users can insert own accounts"
   on public.accounts for insert
@@ -140,11 +145,17 @@ create policy "Users can update own accounts"
   using ((select auth.uid()) = user_id)
   with check ((select auth.uid()) = user_id);
 
+-- Salvaguarda Regras 1 & 3: Bloqueio de Hard Delete físico direto no banco
+create policy "Disallow physical delete on accounts"
+  on public.accounts for delete
+  to authenticated
+  using (false);
+
 -- Políticas para transactions
-create policy "Users can view own transactions"
+create policy "Users can view own active transactions"
   on public.transactions for select
   to authenticated
-  using ((select auth.uid()) = user_id);
+  using ((select auth.uid()) = user_id and deleted_at is null);
 
 create policy "Users can insert own transactions"
   on public.transactions for insert
@@ -157,16 +168,17 @@ create policy "Users can update own transactions"
   using ((select auth.uid()) = user_id)
   with check ((select auth.uid()) = user_id);
 
-create policy "Users can delete own transactions"
+-- Salvaguarda Regras 1 & 3: Bloqueio de Hard Delete físico direto no banco
+create policy "Disallow physical delete on transactions"
   on public.transactions for delete
   to authenticated
-  using ((select auth.uid()) = user_id);
+  using (false);
 
 -- Políticas para budgets
-create policy "Users can view own budgets"
+create policy "Users can view own active budgets"
   on public.budgets for select
   to authenticated
-  using ((select auth.uid()) = user_id);
+  using ((select auth.uid()) = user_id and deleted_at is null);
 
 create policy "Users can insert own budgets"
   on public.budgets for insert
@@ -179,10 +191,11 @@ create policy "Users can update own budgets"
   using ((select auth.uid()) = user_id)
   with check ((select auth.uid()) = user_id);
 
-create policy "Users can delete own budgets"
+-- Salvaguarda Regras 1 & 3: Bloqueio de Hard Delete físico direto no banco
+create policy "Disallow physical delete on budgets"
   on public.budgets for delete
   to authenticated
-  using ((select auth.uid()) = user_id);
+  using (false);
 
 -- ==============================================================================
 -- TRIGGER AUTOMÁTICO: NOVO USUÁRIO -> PERFIL + DADOS PADRÃO

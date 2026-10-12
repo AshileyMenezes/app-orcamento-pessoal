@@ -18,13 +18,15 @@ export async function getBudgetsWithSpent(month?: number, year?: number): Promis
 
   if (authError || !user) return [];
 
-  // Buscar orçamentos do mês/ano com a categoria relacionada
+  // Buscar orçamentos do mês/ano com a categoria relacionada (Regras 1 & 3)
   const { data: budgets, error: budgetError } = await supabase
     .from('budgets')
     .select(`
       *,
       category:categories(*)
     `)
+    .eq('user_id', user.id)
+    .is('deleted_at', null)
     .eq('month', currentMonth)
     .eq('year', currentYear);
 
@@ -40,6 +42,8 @@ export async function getBudgetsWithSpent(month?: number, year?: number): Promis
   const { data: expenses } = await supabase
     .from('transactions')
     .select('category_id, amount')
+    .eq('user_id', user.id)
+    .is('deleted_at', null)
     .eq('type', 'expense')
     .eq('status', 'completed')
     .gte('date', startDate)
@@ -88,6 +92,7 @@ export async function createOrUpdateBudget(input: BudgetInput) {
         month: parsed.data.month,
         year: parsed.data.year,
         amount_limit: parsed.data.amount_limit,
+        deleted_at: null,
       },
       { onConflict: 'user_id, category_id, month, year' }
     );
@@ -107,11 +112,13 @@ export async function deleteBudget(id: string) {
 
   if (!user) return { error: 'Não autorizado' };
 
+  // Regra 1 (Salvaguarda Não-Destrutiva): Soft Delete com deleted_at
   const { error } = await supabase
     .from('budgets')
-    .delete()
+    .update({ deleted_at: new Date().toISOString() })
     .eq('id', id)
-    .eq('user_id', user.id);
+    .eq('user_id', user.id)
+    .is('deleted_at', null);
 
   if (error) return { error: error.message };
 

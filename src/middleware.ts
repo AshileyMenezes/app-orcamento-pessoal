@@ -1,9 +1,16 @@
 import { type NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 
-export async function middleware(request: NextRequest) {
+// Next.js 16 (v16.0.0+) canonical convention: proxy
+export async function proxy(request: NextRequest) {
   return await updateSession(request);
 }
+
+export async function middleware(request: NextRequest) {
+  return await proxy(request);
+}
+
+export default proxy;
 
 export const config = {
   matcher: [

@@ -30,6 +30,8 @@ export async function getTransactions(filters?: {
       category:categories(*),
       account:accounts(*)
     `)
+    .eq('user_id', user.id)
+    .is('deleted_at', null)
     .order('date', { ascending: false })
     .order('created_at', { ascending: false });
 
@@ -152,7 +154,8 @@ export async function updateTransaction(
       ...input,
     })
     .eq('id', id)
-    .eq('user_id', user.id);
+    .eq('user_id', user.id)
+    .is('deleted_at', null);
 
   if (error) {
     if (error.code === '401' || error.code === '403') {
@@ -177,11 +180,13 @@ export async function deleteTransaction(id: string) {
 
   if (!user) return { error: 'Não autorizado' };
 
+  // Regra 1 (Salvaguarda Não-Destrutiva): Soft Delete com deleted_at
   const { error } = await supabase
     .from('transactions')
-    .delete()
+    .update({ deleted_at: new Date().toISOString() })
     .eq('id', id)
-    .eq('user_id', user.id);
+    .eq('user_id', user.id)
+    .is('deleted_at', null);
 
   if (error) return { error: error.message };
 

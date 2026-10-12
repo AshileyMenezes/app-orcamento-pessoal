@@ -38,10 +38,12 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   const lastDay = new Date(currentYear, currentMonth, 0).getDate();
   const endOfMonth = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
-  // 1. Buscar contas
+  // 1. Buscar contas ativas do usuário (Regras 1 & 3)
   const { data: accounts, error: accError } = await supabase
     .from('accounts')
-    .select('initial_balance');
+    .select('initial_balance')
+    .eq('user_id', user.id)
+    .is('deleted_at', null);
 
   if (accError && (accError.code === '401' || accError.code === '403')) {
     return {
@@ -55,7 +57,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     };
   }
 
-  // 2. Buscar todas as transações concluídas do usuário
+  // 2. Buscar todas as transações concluídas e ativas do usuário (Regras 1 & 3)
   const { data: allTransactions, error: txError } = await supabase
     .from('transactions')
     .select(`
@@ -63,6 +65,8 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
       category:categories(*),
       account:accounts(*)
     `)
+    .eq('user_id', user.id)
+    .is('deleted_at', null)
     .eq('status', 'completed')
     .order('date', { ascending: false })
     .order('created_at', { ascending: false });

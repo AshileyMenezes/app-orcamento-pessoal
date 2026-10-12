@@ -42,14 +42,17 @@ export interface TransactionCalcItem {
     color?: string;
   } | null;
   date?: string;
+  deleted_at?: string | null;
 }
 
 /**
  * Calcula a variação líquida (delta) das transações concluídas utilizando Big.js
- * Receitas somam, despesas subtraem.
+ * Receitas somam, despesas subtraem. Itens com soft-delete (deleted_at) são ignorados.
  */
 export function calculateBalanceDelta(transactions: TransactionCalcItem[]): Big {
   return transactions.reduce((acc, t) => {
+    // Salvaguarda Regra 1: ignorar registros com soft-delete
+    if (t.deleted_at) return acc;
     if (t.status && t.status !== 'completed') return acc;
     const amount = toBig(t.amount);
     
@@ -104,6 +107,7 @@ export function calculateFinancialTotals(transactions: TransactionCalcItem[]): {
   let expenseBig = new Big(0);
 
   for (const t of transactions) {
+    if (t.deleted_at) continue;
     if (t.status && t.status !== 'completed') continue;
     const amt = toBig(t.amount);
     if (t.type === 'income') {
@@ -148,6 +152,7 @@ export function calculateCategoryExpenseTotals(
   let totalExpenseBig = new Big(0);
 
   for (const t of transactions) {
+    if (t.deleted_at) continue;
     if (t.status && t.status !== 'completed') continue;
     if (t.type !== 'expense') continue;
 

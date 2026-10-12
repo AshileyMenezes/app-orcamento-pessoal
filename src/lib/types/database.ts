@@ -20,6 +20,7 @@ export interface Category {
   icon: string;
   color: string;
   created_at: string;
+  deleted_at?: string | null;
 }
 
 export interface Account {
@@ -30,6 +31,7 @@ export interface Account {
   initial_balance: number;
   color: string;
   created_at: string;
+  deleted_at?: string | null;
   current_balance?: number;
 }
 
@@ -44,6 +46,7 @@ export interface Transaction {
   date: string;
   status: TransactionStatus;
   created_at: string;
+  deleted_at?: string | null;
 }
 
 export interface TransactionWithDetails extends Transaction {
@@ -59,6 +62,7 @@ export interface Budget {
   year: number;
   amount_limit: number;
   created_at: string;
+  deleted_at?: string | null;
 }
 
 export interface BudgetWithCategory extends Budget {
